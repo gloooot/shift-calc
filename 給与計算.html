@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>バイト給与計算</title>
+  <style>
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #ccc;
+    }
+    td[readonly] {
+      background-color: #eee;
+    }
+    .summary-table td {
+      background-color: #fff;
+    }
+    .workday {
+      background-color: #e0f7e0;
+    }
+    .summary-table td.label {
+      font-weight: bold;
+      background-color: #ccc;
+    }
+    .summary-table td.total {
+      font-weight: bold;
+      font-size: 1.4em;
+      background-color: #ccc;
+    }
+    input::placeholder {
+      color: #999;
+    }
+    .small-input {
+      width: 3em;
+    }
+    .compact-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    input[type="text"].start, input[type="text"].end {
+      width: 80px;
+    }
+  </style>
+</head>
+<body>
+  <h2>バイト給与計算機（手入力版）</h2>
+
+  <label>通常時給（円）: <input type="number" id="baseWage" value="1000"></label><br>
+  <label>深夜時給倍率: <input type="number" id="nightRate" step="0.01" value="1.25"></label><br>
+  <label>計算単位: 
+    <select id="rounding">
+      <option value="1">1分単位</option>
+      <option value="15">15分単位</option>
+    </select>
+  </label><br><br>
+
+  <div id="customBreakRules">
+    <div class="compact-row"><input class="small-input" value="4">時間未満 → <input class="small-input" value="0">分</div>
+    <div class="compact-row"><input class="small-input" value="4">時間以上<input class="small-input" value="6">時間未満 → <input class="small-input" value="15">分</div>
+    <div class="compact-row"><input class="small-input" value="6">時間以上<input class="small-input" value="9">時間未満 → <input class="small-input" value="45">分</div>
+    <div class="compact-row"><input class="small-input" value="9">時間以上 → <input class="small-input" value="60">分</div>
+  </div>
+
+  <p>【入力方法】<br>・出勤時間：例）17:00→1700<br>・退勤時間：例）2:00→0200<br>【休憩ルール】上記時間帯に応じて自動反映</p>
+
+  <table id="shiftTable">
+    <thead>
+      <tr>
+        <th>日</th>
+        <th>出勤（例:1700→17:00）</th>
+        <th>退勤（例:0200→2:00）</th>
+        <th>日給（円）</th>
+        <th>休憩（分）</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h3>集計</h3>
+  <table class="summary-table">
+    <tbody>
+      <tr><td class="label">出勤日数</td><td id="workDays"></td></tr>
+      <tr><td class="label">通常時給</td><td id="normalWage"></td></tr>
+      <tr><td>通常時間（h）</td><td id="normalHours"></td></tr>
+      <tr><td>通常給与（円）</td><td id="normalPay"></td></tr>
+      <tr><td class="label">深夜時給</td><td id="nightWage"></td></tr>
+      <tr><td>深夜時間（h）</td><td id="nightHours"></td></tr>
+      <tr><td>深夜給与（円）</td><td id="nightPay"></td></tr>
+      <tr><td>休憩時間（min）</td><td id="breakMinutes"></td></tr>
+      <tr><td class="total">合計（円）</td><td class="total" id="total"></td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    const tbody = document.querySelector("#shiftTable tbody");
+
+    for (let i = 1; i <= 31; i++) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${i}</td>
+        <td><input type="text" class="start" inputmode="numeric" placeholder="例:1700"></td>
+        <td><input type="text" class="end" inputmode="numeric" placeholder="例:0200"></td>
+        <td><input type="text" class="pay" readonly></td>
+        <td><input type="text" class="rest" readonly></td>`;
+      tbody.appendChild(tr);
+    }
+
+    function calcPay() {
+      const rows = tbody.querySelectorAll("tr");
+      const baseWage = Number(document.getElementById("baseWage").value);
+      const nightRate = Number(document.getElementById("nightRate").value);
+      const nightWage = Math.ceil(baseWage * nightRate);
+      const rounding = Number(document.getElementById("rounding").value);
+
+      let workDays = 0, normalMinutes = 0, nightMinutes = 0, breakMinutes = 0;
+
+      rows.forEach(row => {
+        const startVal = row.querySelector(".start").value;
+        const endVal = row.querySelector(".end").value;
+        const payCell = row.querySelector(".pay");
+        const restCell = row.querySelector(".rest");
+
+        row.classList.remove("workday");
+
+        if (!/^[0-2]?[0-9][0-5][0-9]$/.test(startVal) || !/^[0-2]?[0-9][0-5][0-9]$/.test(endVal)) {
+          payCell.value = "";
+          restCell.value = "";
+          return;
+        }
+
+        const parseTime = t => Number(t.slice(0, 2)) * 60 + Number(t.slice(2));
+        let start = parseTime(startVal.padStart(4, '0'));
+        let end = parseTime(endVal.padStart(4, '0'));
+        if (end <= start) end += 1440;
+
+        let total = end - start;
+        let rest = 0;
+        const hours = total / 60;
+        if (hours < 4) rest = 0;
+        else if (hours < 6) rest = 15;
+        else if (hours < 9) rest = 45;
+        else rest = 60;
+
+        restCell.value = rest;
+        breakMinutes += rest;
+        total -= rest;
+
+        let night = 0;
+        for (let m = start; m < end; m++) {
+          const t = m % 1440;
+          if (t >= 1320 || t < 300) night++;
+        }
+
+        night = Math.max(night - rest, 0);
+        if (rounding === 15) {
+          total = Math.floor(total / 15) * 15;
+          night = Math.floor(night / 15) * 15;
+        }
+
+        const normal = total - night;
+        normalMinutes += normal;
+        nightMinutes += night;
+        workDays++;
+
+        row.classList.add("workday");
+
+        const yen = Math.floor(normal / 60 * baseWage + night / 60 * nightWage);
+        payCell.value = yen.toLocaleString();
+      });
+
+      document.getElementById("workDays").textContent = workDays + "日";
+      document.getElementById("normalWage").textContent = baseWage.toLocaleString() + "円";
+      document.getElementById("normalHours").textContent = (normalMinutes / 60).toFixed(2);
+      document.getElementById("normalPay").textContent = Math.floor(normalMinutes / 60 * baseWage).toLocaleString();
+      document.getElementById("nightWage").textContent = nightWage.toLocaleString() + "円";
+      document.getElementById("nightHours").textContent = (nightMinutes / 60).toFixed(2);
+      document.getElementById("nightPay").textContent = Math.floor(nightMinutes / 60 * nightWage).toLocaleString();
+      document.getElementById("breakMinutes").textContent = breakMinutes;
+      document.getElementById("total").textContent = Math.floor((normalMinutes / 60 * baseWage) + (nightMinutes / 60 * nightWage)).toLocaleString();
+    }
+
+    document.querySelectorAll("input").forEach(el => el.addEventListener("input", calcPay));
+  </script>
+</body>
+</html>
