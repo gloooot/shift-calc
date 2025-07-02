@@ -21,6 +21,16 @@
     td[readonly] {
       background-color: #eee;
     }
+    input[type="text"], input[type="number"] {
+      padding: 5px;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+      width: 80px;
+    }
+    input[type="text"]:focus, input[type="number"]:focus {
+      border-color: #007BFF;
+      outline: none;
+    }
     .summary-table td {
       background-color: #fff;
     }
@@ -51,6 +61,22 @@
     input[type="text"].start, input[type="text"].end {
       width: 80px;
     }
+    .collapsible {
+      background-color: #eee;
+      cursor: pointer;
+      padding: 10px;
+      border: none;
+      text-align: left;
+      outline: none;
+      font-size: 1em;
+      width: 100%;
+      margin-top: 10px;
+    }
+    .content {
+      padding: 0 10px;
+      display: none;
+      overflow: hidden;
+    }
   </style>
 </head>
 <body>
@@ -60,12 +86,13 @@
   <label>深夜時給倍率: <input type="number" id="nightRate" step="0.01" value="1.25"></label><br>
   <label>計算単位: 
     <select id="rounding">
-      <option value="15">15分単位</option>
       <option value="1">1分単位</option>
+      <option value="15">15分単位</option>
     </select>
   </label><br><br>
 
-  <div id="customBreakRules">
+  <button type="button" class="collapsible">休憩ルール（クリックで表示/非表示）</button>
+  <div class="content" id="customBreakRules">
     <div class="compact-row"><input class="small-input" value="4">時間未満 → <input class="small-input" value="0">分</div>
     <div class="compact-row"><input class="small-input" value="4">時間以上<input class="small-input" value="6">時間未満 → <input class="small-input" value="15">分</div>
     <div class="compact-row"><input class="small-input" value="6">時間以上<input class="small-input" value="9">時間未満 → <input class="small-input" value="45">分</div>
@@ -190,6 +217,12 @@
     }
 
     document.querySelectorAll("input").forEach(el => el.addEventListener("input", calcPay));
+
+    document.querySelector(".collapsible").addEventListener("click", function () {
+      this.classList.toggle("active");
+      const content = this.nextElementSibling;
+      content.style.display = content.style.display === "block" ? "none" : "block";
+    });
   </script>
 </body>
 </html>
