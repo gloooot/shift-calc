@@ -13,12 +13,15 @@
     input[type=text],input[type=number]{width:80px;padding:5px;border:1px solid #aaa;border-radius:4px}
     input:focus{border-color:#007bff;outline:none}
     input::placeholder{color:#bbb}
+    /* 出勤・退勤セル幅を1/2（40px）に */
+    .start,.end{width:40px}
     th:nth-child(4),td:nth-child(4){border-left:4px double #444}
 
     .workday td{background:#e0f7e0}
     .invalid-input{border:2px solid red!important}
 
     /* 集計 */
+    .summary-table{width:100%}
     .summary-table td.label{font-weight:bold;background:#ccc}
     .summary-table td.total{font-weight:bold;font-size:1.5em;background:#ccc}
     .summary-table td{min-width:90px}
