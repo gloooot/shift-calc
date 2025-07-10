@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>バイト給与計算機</title>
+  <style>
+    /* === 基本スタイル === */
+    table{border-collapse:collapse;width:100%;margin-top:20px}
+    th,td{border:1px solid #999;padding:8px;text-align:center}
+    th{background:#ccc}
+    td[readonly]{background:#eee}
+    input[type=text],input[type=number]{width:80px;padding:5px;border:1px solid #aaa;border-radius:4px}
+    input:focus{border-color:#007bff;outline:none}
+    input::placeholder{color:#bbb}
+    .start,.end{width:40px}
+    th:nth-child(4),td:nth-child(4){border-left:4px double #444}
+
+    .workday td{background:#e0f7e0}
+    .invalid-input{border:2px solid red!important}
+
+    .summary-table{width:100%}
+    .summary-table td.label{font-weight:bold;background:#ccc}
+    .summary-table td.total{font-weight:bold;font-size:1.5em;background:#ccc}
+    .summary-table td{min-width:90px}
+
+    .collapsible{background:#eee;border:none;padding:10px;width:100%;text-align:left;cursor:pointer;margin-top:10px}
+    .content{display:none;padding:0 10px}
+    .compact-row{display:flex;gap:4px;align-items:center;margin-bottom:4px}
+    .small-input{width:3em}
+
+    .holidayRow{display:none}
+    .upLabel{margin-left:4px;color:#007bff;font-weight:bold}
+  </style>
+</head>
+<body>
+  <!-- ★ ログイン用ポップアップフォーム -->
+<div id="loginModal" style="display:none; position:fixed; top:30%; left:50%; transform:translate(-50%, -50%); background:#fff; padding:20px; border:1px solid #aaa; box-shadow:0 0 10px rgba(0,0,0,0.3); z-index:1000;">
+  <h3>ログイン</h3>
+  <input type="email" id="emailInput" placeholder="メールアドレス"><br><br>
+  <input type="password" id="passwordInput" placeholder="パスワード"><br><br>
+  <button id="submitLogin">ログインする</button>
+  <button onclick="document.getElementById('loginModal').style.display='none'">キャンセル</button>
+</div>
+
+<h2>バイト給与計算機</h2>
+<button id="loginBtn">ログイン</button>
+
+<!-- ★ 管理者専用セクション（ログイン後表示） -->
+<div id="adminPanel" style="display:none; margin-top:20px; padding:10px; border:1px solid #999;">
+  <h3>管理者ページ</h3>
+  <p>ログインに成功しました。ここに103万円の壁の可視化などを今後追加予定です。</p>
+</div>
+
+<label>通常時給（円）: <input type="number" id="baseWage" value="1110"></label><br>
+<label>深夜時給倍率: <input type="number" id="nightRate" step="0.01" value="1.25"></label><br>
+<label>計算単位:
+  <select id="rounding"><option value="15">15分単位</option><option value="1">1分単位</option></select>
+</label><br><br>
+
+<!-- 正月設定 -->
+<label><input type="checkbox" id="enableHoliday"> 正月給を計算する</label>
+<div id="holidayConfig" style="display:none;margin-top:6px">
+  <label>正月加算: <input type="number" id="holidayInc" value="50">円<span class="upLabel">up</span></label><br>
+  <label>正月期間:
+    <input type="number" id="holidayStart" value="1" min="1" max="31" style="width:60px">日 ～
+    <input type="number" id="holidayEnd"   value="3" min="1" max="31" style="width:60px">日
+  </label>
+</div>
+
+<!-- 休憩ルール -->
+<button class="collapsible">休憩ルール（クリックで表示/非表示）</button>
+<div class="content" id="customBreakRules">
+  <div class="compact-row"><input class="small-input" value="4">時間未満 → <input class="small-input" value="0">分</div>
+  <div class="compact-row"><input class="small-input" value="4">時間以上<input class="small-input" value="6">時間未満 → <input class="small-input" value="15">分</div>
+  <div class="compact-row"><input class="small-input" value="6">時間以上<input class="small-input" value="9">時間未満 → <input class="small-input" value="45">分</div>
+  <div class="compact-row"><input class="small-input" value="9">時間以上 → <input class="small-input" value="60">分</div>
+</div>
+
+<p>【入力方法】<br>出勤: 17:00 → <b>1700</b> / 退勤: 2:00 → <b>0200</b></p>
+
+<table id="shiftTable">
+  <thead><tr><th>日</th><th>出勤</th><th>退勤</th><th>日給（円）</th><th>休憩（分）</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<h3>集計</h3>
+<table class="summary-table">
+  <thead>
+    <tr><th class="label" colspan="2">出勤日数</th><th colspan="2" id="workDays"></th></tr>
+    <tr><th>項目</th><th>時給</th><th>時間</th><th>金額</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="label">通常時給</td><td id="normalWage"></td><td id="normalHours"></td><td id="normalPay"></td></tr>
+    <tr><td class="label">通常深夜</td><td id="nightWage"></td><td id="nightHours"></td><td id="nightPay"></td></tr>
+    <tr class="holidayRow"><td class="label">正月時給</td><td id="holidayWageDisplay"></td><td id="holidayHours"></td><td id="holidayPay"></td></tr>
+    <tr class="holidayRow"><td class="label">正月深夜</td><td id="holidayNightWageDisplay"></td><td id="holidayNightHours"></td><td id="holidayNightPay"></td></tr>
+    <tr><td class="total" colspan="3">合計(円)</td><td class="total" id="total"></td></tr>
+  </tbody>
+</table>
+<p id="breakNote" style="font-size:0.9em;color:#555"></p>
+
+<!-- Firebase SDKをbodyの最後に配置 -->
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyB-kgBOs1LlBwK2oeNEdWjtkjBSeCw5P7Y",
+  authDomain: "sift-f2894.firebaseapp.com",
+  projectId: "sift-f2894",
+  storageBucket: "sift-f2894.appspot.com",
+  messagingSenderId: "719109606129",
+  appId: "1:719109606129:web:e8178059a43bc171fef750"
+};
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+
+// ログイン処理
+const loginBtn = document.getElementById("loginBtn");
+loginBtn.addEventListener("click", () => {
+  document.getElementById("loginModal").style.display = "block";
+});
+
+document.getElementById("submitLogin").addEventListener("click", () => {
+  const email = document.getElementById("emailInput").value;
+  const password = document.getElementById("passwordInput").value;
+  auth.signInWithEmailAndPassword(email, password)
+    .then((userCredential) => {
+      alert("ログイン成功: " + userCredential.user.email);
+      document.getElementById("loginModal").style.display = "none";
+      document.getElementById("adminPanel").style.display = "block";
+    })
+    .catch((error) => {
+      alert("ログインエラー: " + error.message);
+    });
+});
+</script>
+</body>
+</html>
