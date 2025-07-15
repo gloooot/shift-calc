@@ -350,8 +350,8 @@ function calculateDayShift(startTime, endTime, day, holidayStart, holidayEnd, en
   
   const isHoliday = enableHoliday && day >= holidayStart && day <= holidayEnd;
   
-  // 時間帯別計算
-  const { normalHours, nightHours } = calculateHoursByPeriod(start, end, roundedMinutes);
+  // 時間帯別計算（休憩時間を深夜から優先的に引く）
+  const { normalHours, nightHours } = calculateHoursByPeriodWithBreak(start, end, totalMinutes, breakMinutes);
   
   return {
     normalHours: isHoliday ? 0 : normalHours,
@@ -400,22 +400,37 @@ function getBreakRules() {
   return rules.sort((a, b) => a.minHours - b.minHours);
 }
 
-// 時間帯別時間計算（通常/深夜）
-function calculateHoursByPeriod(startMinutes, endMinutes, actualWorkMinutes) {
+// 時間帯別時間計算（休憩時間を深夜から優先的に引く）
+function calculateHoursByPeriodWithBreak(startMinutes, endMinutes, totalMinutes, breakMinutes) {
   const nightStart = 22 * 60; // 22:00
   const nightEnd = 5 * 60;    // 5:00
   
   let normalMinutes = 0;
   let nightMinutes = 0;
   
-  // 実働時間分だけループして、通常時間と深夜時間を分ける
-  for (let m = 0; m < actualWorkMinutes; m++) {
+  // まず全体の労働時間を通常時間と深夜時間に分ける
+  for (let m = 0; m < totalMinutes; m++) {
     const currentMinute = (startMinutes + m) % (24 * 60);
     if (currentMinute >= nightStart || currentMinute < nightEnd) {
       nightMinutes++;
     } else {
       normalMinutes++;
     }
+  }
+  
+  // 休憩時間を深夜時間から優先的に引く
+  let remainingBreak = breakMinutes;
+  
+  if (remainingBreak > 0 && nightMinutes > 0) {
+    const deductFromNight = Math.min(remainingBreak, nightMinutes);
+    nightMinutes -= deductFromNight;
+    remainingBreak -= deductFromNight;
+  }
+  
+  if (remainingBreak > 0 && normalMinutes > 0) {
+    const deductFromNormal = Math.min(remainingBreak, normalMinutes);
+    normalMinutes -= deductFromNormal;
+    remainingBreak -= deductFromNormal;
   }
   
   return {
