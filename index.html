@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>バイト給与計算機</title>
   <style>
-    /* === 基本スタイル === */
     table{border-collapse:collapse;width:100%;margin-top:20px}
     th,td{border:1px solid #999;padding:8px;text-align:center}
     th{background:#ccc}
@@ -13,40 +12,66 @@
     input[type=text],input[type=number]{width:80px;padding:5px;border:1px solid #aaa;border-radius:4px}
     input:focus{border-color:#007bff;outline:none}
     input::placeholder{color:#bbb}
-    /* 出勤・退勤セル幅を1/2（40px）に */
     .start,.end{width:40px}
     th:nth-child(4),td:nth-child(4){border-left:4px double #444}
-
     .workday td{background:#e0f7e0}
     .invalid-input{border:2px solid red!important}
-
-    /* 集計 */
     .summary-table{width:100%}
     .summary-table td.label{font-weight:bold;background:#ccc}
     .summary-table td.total{font-weight:bold;font-size:1.5em;background:#ccc}
     .summary-table td{min-width:90px}
-
-    /* 折りたたみ */
     .collapsible{background:#eee;border:none;padding:10px;width:100%;text-align:left;cursor:pointer;margin-top:10px}
     .content{display:none;padding:0 10px}
     .compact-row{display:flex;gap:4px;align-items:center;margin-bottom:4px}
     .small-input{width:3em}
-
-    /* 正月行 */
     .holidayRow{display:none}
     .upLabel{margin-left:4px;color:#007bff;font-weight:bold}
+    .salary-input{width:60px;text-align:right;padding:3px;}
+    input.modified{color:#d33;font-weight:bold;}
+    #messageBox{margin-top:1em;color:green;font-weight:bold;}
+    .bar-container{background:#ddd;border-radius:4px;overflow:hidden;margin-top:10px;}
+    .bar{background:#4caf50;height:20px;transition:width 0.5s;}
+    .salary-input{width:60px;text-align:right;padding:3px;}
+    input.modified{color:#d33;font-weight:bold;}
+    #messageBox{margin-top:1em;color:green;font-weight:bold;}
+    .bar-container{background:#ddd;border-radius:4px;overflow:hidden;margin-top:10px;}
+    .bar{background:#4caf50;height:20px;transition:width 0.5s;}
   </style>
 </head>
 <body>
+<div id="loginModal" style="display:none; position:fixed; top:30%; left:50%; transform:translate(-50%, -50%); background:#fff; padding:20px; border:1px solid #aaa; box-shadow:0 0 10px rgba(0,0,0,0.3); z-index:1000;">
+  <h3>ログイン</h3>
+  <input type="email" id="emailInput" placeholder="メールアドレス"><br><br>
+  <input type="password" id="passwordInput" placeholder="パスワード"><br><br>
+  <button id="submitLogin">ログインする</button>
+  <button onclick="document.getElementById('loginModal').style.display='none'">キャンセル</button>
+</div>
 <h2>バイト給与計算機</h2>
-
+<button id="loginBtn">ログイン</button>
+<div id="adminPanel" style="display:none; margin-top:20px; padding:10px; border:1px solid #999;">
+  <h3>管理者ページ</h3>
+  <p>ログインに成功しました。ここに103万円の壁の可視化などを今後追加予定です。</p>
+  <div class="status">
+    年間給与合計：<span id="totalDisplay">--</span> 円<br>
+    残り：<span class="highlight" id="remainingDisplay">--</span> 円
+  </div>
+  <div class="bar-container">
+    <div class="bar" id="progressBar" style="width:0%"></div>
+  </div>
+  <button id="loadDataBtn">データを読み込む</button>
+  <h4>月別給与入力</h4>
+  <table>
+    <thead><tr><th>月</th><th>金額（円）</th></tr></thead>
+    <tbody id="salaryTable"></tbody>
+  </table>
+  <button id="saveAllBtn">すべて保存する</button>
+  <div id="messageBox"></div>
+</div>
 <label>通常時給（円）: <input type="number" id="baseWage" value="1110"></label><br>
 <label>深夜時給倍率: <input type="number" id="nightRate" step="0.01" value="1.25"></label><br>
 <label>計算単位:
   <select id="rounding"><option value="15">15分単位</option><option value="1">1分単位</option></select>
 </label><br><br>
-
-<!-- 正月設定 -->
 <label><input type="checkbox" id="enableHoliday"> 正月給を計算する</label>
 <div id="holidayConfig" style="display:none;margin-top:6px">
   <label>正月加算: <input type="number" id="holidayInc" value="50">円<span class="upLabel">up</span></label><br>
@@ -55,8 +80,6 @@
     <input type="number" id="holidayEnd"   value="3" min="1" max="31" style="width:60px">日
   </label>
 </div>
-
-<!-- 休憩ルール -->
 <button class="collapsible">休憩ルール（クリックで表示/非表示）</button>
 <div class="content" id="customBreakRules">
   <div class="compact-row"><input class="small-input" value="4">時間未満 → <input class="small-input" value="0">分</div>
@@ -64,14 +87,11 @@
   <div class="compact-row"><input class="small-input" value="6">時間以上<input class="small-input" value="9">時間未満 → <input class="small-input" value="45">分</div>
   <div class="compact-row"><input class="small-input" value="9">時間以上 → <input class="small-input" value="60">分</div>
 </div>
-
 <p>【入力方法】<br>出勤: 17:00 → <b>1700</b> / 退勤: 2:00 → <b>0200</b></p>
-
 <table id="shiftTable">
   <thead><tr><th>日</th><th>出勤</th><th>退勤</th><th>日給（円）</th><th>休憩（分）</th></tr></thead>
   <tbody></tbody>
 </table>
-
 <h3>集計</h3>
 <table class="summary-table">
   <thead>
@@ -87,67 +107,371 @@
   </tbody>
 </table>
 <p id="breakNote" style="font-size:0.9em;color:#555"></p>
-
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 <script>
-const $=s=>document.querySelector(s);
-const $$=s=>document.querySelectorAll(s);
-const toMin=t=>+t.slice(0,2)*60+ +t.slice(2);
-const fmt=n=>n.toLocaleString();
-
-// shift rows
-const tbody=$('#shiftTable tbody');
-for(let d=1;d<=31;d++){
-  tbody.insertAdjacentHTML('beforeend',`<tr data-day="${d}"><td>${d}</td><td><input class="start" placeholder="1700" inputmode="numeric"></td><td><input class="end" placeholder="0200" inputmode="numeric"></td><td class="pay">0</td><td class="rest">0</td></tr>`);
+const firebaseConfig = {
+  apiKey: "AIzaSyB-kgBOs1LlBwK2oeNEdWjtkjBSeCw5P7Y",
+  authDomain: "sift-f2894.firebaseapp.com",
+  projectId: "sift-f2894",
+  storageBucket: "sift-f2894.appspot.com",
+  messagingSenderId: "719109606129",
+  appId: "1:719109606129:web:e8178059a43bc171fef750"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const loginBtn = document.getElementById("loginBtn");
+loginBtn.addEventListener("click", () => {
+  document.getElementById("loginModal").style.display = "block";
+});
+document.getElementById("submitLogin").addEventListener("click", () => {
+  const email = document.getElementById("emailInput").value;
+  const password = document.getElementById("passwordInput").value;
+  auth.signInWithEmailAndPassword(email, password)
+    .then((userCredential) => {
+      alert("ログイン成功: " + userCredential.user.email);
+      document.getElementById("loginModal").style.display = "none";
+      document.getElementById("adminPanel").style.display = "block";
+      loadData();
+    })
+    .catch((error) => {
+      alert("ログインエラー: " + error.message);
+    });
+});
+const tbody = document.querySelector('#shiftTable tbody');
+for (let d = 1; d <= 31; d++) {
+  tbody.insertAdjacentHTML('beforeend', `<tr data-day="${d}"><td>${d}</td><td><input class="start" placeholder="1700" inputmode="numeric"></td><td><input class="end" placeholder="0200" inputmode="numeric"></td><td class="pay">0</td><td class="rest">0</td></tr>`);
 }
-
-// collapsible
-$('.collapsible').onclick=()=>{
-  const c=$('#customBreakRules');c.style.display=c.style.display==='block'?'none':'block';
-};
-
-// holiday toggle
-$('#enableHoliday').onchange=()=>{
-  const on=$('#enableHoliday').checked;
-  $('#holidayConfig').style.display=on?'block':'none';
-  $$('.holidayRow').forEach(r=>r.style.display=on?'table-row':'none');
-  calc();
-};
-
-// break rule
-function getBreakMin(h){
-  const rows=[...$('#customBreakRules').querySelectorAll('.compact-row')].map(r=>[...r.querySelectorAll('input')].map(x=>+x.value||0));
-  let rest=0;
-  rows.forEach((r,i)=>{
-    if(r.length===2){if(i===0&&h<r[0])rest=r[1];else if(i>0&&h>=r[0])rest=r[1];}
-    else{const[min,max,k]=r;if(h>=min&&(max===0||h<max))rest=k;}
+const currentUser = () => auth.currentUser;
+const months = Array.from({ length: 12 }, (_, i) => `${new Date().getFullYear()}-${String(i + 1).padStart(2, "0")}`);
+const salaryTable = document.getElementById("salaryTable");
+let salaries = {};
+months.forEach(month => {
+  const row = document.createElement("tr");
+  row.innerHTML = `<td>${month}</td><td><input type="number" class="salary-input" id="sal-${month}" placeholder="0"></td>`;
+  salaryTable.appendChild(row);
+});
+async function loadData() {
+  if (!currentUser()) return;
+  try {
+    const ref = db.collection("users").doc(currentUser().uid).collection("salaries");
+    const snapshot = await ref.get();
+    let total = 0;
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const month = doc.id;
+      if ('total' in data && typeof data.total === 'number') {
+        salaries[month] = data.total;
+        const input = document.getElementById(`sal-${month}`);
+        if (input) input.value = data.total;
+        total += data.total;
+      }
+    });
+    updateDisplay(total);
+  } catch (e) {
+    console.error("読み込み失敗", e);
+    alert("データ取得に失敗しました");
+  }
+}
+function updateDisplay(total) {
+  const limit = 1030000;
+  const remaining = Math.max(0, limit - total);
+  const percent = Math.min(100, Math.floor((total / limit) * 100));
+  document.getElementById("totalDisplay").textContent = total.toLocaleString();
+  document.getElementById("remainingDisplay").textContent = remaining.toLocaleString();
+  document.getElementById("progressBar").style.width = percent + "%";
+}
+document.getElementById("saveAllBtn").addEventListener("click", async () => {
+  if (!currentUser()) return;
+  try {
+    let newTotal = 0;
+    for (const month of months) {
+      const input = document.getElementById(`sal-${month}`);
+      const val = parseInt(input.value, 10);
+      if (!isNaN(val)) {
+        await db.collection("users").doc(currentUser().uid).collection("salaries").doc(month).set({ total: val });
+        newTotal += val;
+        input.classList.remove("modified");
+      }
+    }
+    document.getElementById("messageBox").textContent = "保存が完了しました";
+    updateDisplay(newTotal);
+  } catch (e) {
+    console.error("保存エラー", e);
+    alert("保存に失敗しました");
+  }
+});
+months.forEach(month => {
+  const input = document.getElementById(`sal-${month}`);
+  input?.addEventListener("input", () => {
+    if (parseInt(input.value, 10) !== salaries[month]) {
+      input.classList.add("modified");
+    } else {
+      input.classList.remove("modified");
+    }
   });
-  return rest;
+});
+
+// === シフト計算機能 ===
+
+// 正月設定の表示/非表示
+document.getElementById('enableHoliday').addEventListener('change', function() {
+  const holidayConfig = document.getElementById('holidayConfig');
+  const holidayRows = document.querySelectorAll('.holidayRow');
+  
+  if (this.checked) {
+    holidayConfig.style.display = 'block';
+    holidayRows.forEach(row => row.style.display = 'table-row');
+  } else {
+    holidayConfig.style.display = 'none';
+    holidayRows.forEach(row => row.style.display = 'none');
+  }
+  calculate();
+});
+
+// 休憩ルールの折りたたみ
+document.querySelector('.collapsible').addEventListener('click', function() {
+  const content = document.querySelector('.content');
+  content.style.display = content.style.display === 'block' ? 'none' : 'block';
+});
+
+// 入力値変更時の計算実行
+document.addEventListener('input', function(e) {
+  if (e.target.matches('#baseWage, #nightRate, #rounding, #holidayInc, #holidayStart, #holidayEnd') ||
+      e.target.matches('.start, .end') ||
+      e.target.matches('#customBreakRules input')) {
+    calculate();
+  }
+});
+
+// メイン計算関数
+function calculate() {
+  const baseWage = parseInt(document.getElementById('baseWage').value) || 0;
+  const nightRate = parseFloat(document.getElementById('nightRate').value) || 1.25;
+  const rounding = parseInt(document.getElementById('rounding').value) || 15;
+  const enableHoliday = document.getElementById('enableHoliday').checked;
+  const holidayInc = parseInt(document.getElementById('holidayInc').value) || 0;
+  const holidayStart = parseInt(document.getElementById('holidayStart').value) || 1;
+  const holidayEnd = parseInt(document.getElementById('holidayEnd').value) || 3;
+
+  // 休憩ルールを取得
+  const breakRules = getBreakRules();
+
+  let totalNormalHours = 0;
+  let totalNightHours = 0;
+  let totalHolidayHours = 0;
+  let totalHolidayNightHours = 0;
+  let workDays = 0;
+
+  const rows = document.querySelectorAll('#shiftTable tbody tr');
+  
+  rows.forEach(row => {
+    const day = parseInt(row.dataset.day);
+    const startInput = row.querySelector('.start');
+    const endInput = row.querySelector('.end');
+    const payCell = row.querySelector('.pay');
+    const restCell = row.querySelector('.rest');
+    
+    const startTime = startInput.value.trim();
+    const endTime = endInput.value.trim();
+    
+    // 入力検証
+    if (!startTime || !endTime) {
+      payCell.textContent = '0';
+      restCell.textContent = '0';
+      row.classList.remove('workday');
+      return;
+    }
+    
+    if (!isValidTime(startTime) || !isValidTime(endTime)) {
+      startInput.classList.add('invalid-input');
+      endInput.classList.add('invalid-input');
+      payCell.textContent = 'エラー';
+      restCell.textContent = 'エラー';
+      return;
+    }
+    
+    startInput.classList.remove('invalid-input');
+    endInput.classList.remove('invalid-input');
+    row.classList.add('workday');
+    workDays++;
+    
+    const { normalHours, nightHours, holidayHours, holidayNightHours, totalMinutes, breakMinutes } = 
+      calculateDayShift(startTime, endTime, day, holidayStart, holidayEnd, enableHoliday, rounding, breakRules);
+    
+    totalNormalHours += normalHours;
+    totalNightHours += nightHours;
+    totalHolidayHours += holidayHours;
+    totalHolidayNightHours += holidayNightHours;
+    
+    // 日給計算
+    const dayPay = 
+      normalHours * baseWage +
+      nightHours * baseWage * nightRate +
+      holidayHours * (baseWage + holidayInc) +
+      holidayNightHours * (baseWage + holidayInc) * nightRate;
+    
+    payCell.textContent = Math.round(dayPay);
+    restCell.textContent = breakMinutes;
+  });
+  
+  // 集計表示
+  updateSummary(baseWage, nightRate, holidayInc, totalNormalHours, totalNightHours, 
+                totalHolidayHours, totalHolidayNightHours, workDays);
 }
 
-// calc
-function calc(){
-  const base=+$('#baseWage').value||0;const nRate=+$('#nightRate').value||0;const nW=Math.ceil(base*nRate);const rounding=+$('#rounding').value;
-  const hOn=$('#enableHoliday').checked;const inc=hOn?+$('#holidayInc').value:0;const hStart=hOn?+$('#holidayStart').value:0;const hEnd=hOn?+$('#holidayEnd').value:0;const hW=base+inc;const hNW=Math.ceil(hW*nRate);
-  if(hOn){$('#holidayWageDisplay').textContent=fmt(hW)+'円';$('#holidayNightWageDisplay').textContent=fmt(hNW)+'円';}
-  let work=0,nMin=0,nnMin=0,hnMin=0,hnnMin=0,brMin=0;
-  tbody.querySelectorAll('tr').forEach(row=>{
-    const sI=row.querySelector('.start');const eI=row.querySelector('.end');const pay=row.querySelector('.pay');const rest=row.querySelector('.rest');row.classList.remove('workday');
-    const s=sI.value.trim(),e=eI.value.trim();const valid=/^\d{4}$/;
-    sI.classList.toggle('invalid-input',s!==''&&!valid.test(s));
-    eI.classList.toggle('invalid-input',e!==''&&!valid.test(e));
-    if(s===''||e===''||!valid.test(s)||!valid.test(e)){pay.textContent='0';rest.textContent='0';return;}
-    let st=toMin(s),ed=toMin(e);if(ed<=st)ed+=1440;
-    let total=ed-st;const hrs=total/60;const br=getBreakMin(hrs);rest.textContent=br;brMin+=br;total-=br;
-    let night=0;for(let m=st;m<ed;m++){const t=m%1440;if(t>=1320||t<300)night++;}night=Math.max(night-br,0);
-    if(rounding===15){total=Math.floor(total/15)*15;night=Math.floor(night/15)*15;}
-    const normal=total-night;const day=+row.dataset.day;const isH=hOn&&day>=hStart&&day<=hEnd;let p;
-    if(isH){hnMin+=normal;hnnMin+=night;p=Math.floor(normal/60*hW+night/60*hNW);}else{nMin+=normal;nnMin+=night;p=Math.floor(normal/60*base+night/60*nW);}pay.textContent=fmt(p);row.classList.add('workday');work++;});
-  $('#workDays').textContent=work+' 日';$('#normalWage').textContent=fmt(base)+'円';$('#normalHours').textContent=(nMin/60).toFixed(2);$('#normalPay').textContent=fmt(Math.floor(nMin/60*base));$('#nightWage').textContent=fmt(nW)+'円';$('#nightHours').textContent=(nnMin/60).toFixed(2);$('#nightPay').textContent=fmt(Math.floor(nnMin/60*nW));if(hOn){$('#holidayHours').textContent=(hnMin/60).toFixed(2);$('#holidayPay').textContent=fmt(Math.floor(hnMin/60*hW));$('#holidayNightHours').textContent=(hnnMin/60).toFixed(2);$('#holidayNightPay').textContent=fmt(Math.floor(hnnMin/60*hNW));}
-  const total=Math.floor(nMin/60*base+nnMin/60*nW+hnMin/60*hW+hnnMin/60*hNW);$('#total').textContent=fmt(total);$('#breakNote').textContent='＊合計休憩 '+brMin+' 分';}
+// 時刻形式の検証
+function isValidTime(timeStr) {
+  if (!/^\d{3,4}$/.test(timeStr)) return false;
+  const hour = Math.floor(parseInt(timeStr) / 100);
+  const minute = parseInt(timeStr) % 100;
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
 
-// bind all inputs
-$$('input,select').forEach(el=>el.addEventListener('input',calc));
-calc();
+// 1日のシフト計算
+function calculateDayShift(startTime, endTime, day, holidayStart, holidayEnd, enableHoliday, rounding, breakRules) {
+  const start = timeToMinutes(startTime);
+  const end = timeToMinutes(endTime);
+  
+  let totalMinutes = end >= start ? end - start : (24 * 60 - start) + end;
+  
+  // 休憩時間計算
+  const workHours = totalMinutes / 60;
+  const breakMinutes = calculateBreakTime(workHours, breakRules);
+  
+  // 実働時間
+  const actualMinutes = totalMinutes - breakMinutes;
+  
+  // 時間の丸め処理
+  const roundedMinutes = Math.floor(actualMinutes / rounding) * rounding;
+  
+  const isHoliday = enableHoliday && day >= holidayStart && day <= holidayEnd;
+  
+  // 時間帯別計算
+  const { normalHours, nightHours } = calculateHoursByPeriod(start, end, roundedMinutes);
+  
+  return {
+    normalHours: isHoliday ? 0 : normalHours,
+    nightHours: isHoliday ? 0 : nightHours,
+    holidayHours: isHoliday ? normalHours : 0,
+    holidayNightHours: isHoliday ? nightHours : 0,
+    totalMinutes: roundedMinutes,
+    breakMinutes
+  };
+}
+
+// 時刻を分に変換
+function timeToMinutes(timeStr) {
+  const hour = Math.floor(parseInt(timeStr) / 100);
+  const minute = parseInt(timeStr) % 100;
+  return hour * 60 + minute;
+}
+
+// 休憩時間計算
+function calculateBreakTime(workHours, breakRules) {
+  for (let i = breakRules.length - 1; i >= 0; i--) {
+    const rule = breakRules[i];
+    if (workHours >= rule.minHours && (rule.maxHours === null || workHours < rule.maxHours)) {
+      return rule.breakMinutes;
+    }
+  }
+  return 0;
+}
+
+// 休憩ルール取得
+function getBreakRules() {
+  const rows = document.querySelectorAll('#customBreakRules .compact-row');
+  const rules = [];
+  
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 3) {
+      const minHours = parseFloat(inputs[0].value) || 0;
+      const maxHours = inputs.length > 3 ? parseFloat(inputs[1].value) : null;
+      const breakMinutes = parseFloat(inputs[inputs.length - 1].value) || 0;
+      
+      rules.push({ minHours, maxHours, breakMinutes });
+    }
+  });
+  
+  return rules.sort((a, b) => a.minHours - b.minHours);
+}
+
+// 時間帯別時間計算（通常/深夜）
+function calculateHoursByPeriod(startMinutes, endMinutes, totalMinutes) {
+  const nightStart = 22 * 60; // 22:00
+  const nightEnd = 5 * 60;    // 5:00
+  
+  let normalMinutes = 0;
+  let nightMinutes = 0;
+  
+  if (endMinutes >= startMinutes) {
+    // 日をまたがない場合
+    for (let m = startMinutes; m < startMinutes + totalMinutes; m++) {
+      const currentMinute = m % (24 * 60);
+      if (currentMinute >= nightStart || currentMinute < nightEnd) {
+        nightMinutes++;
+      } else {
+        normalMinutes++;
+      }
+    }
+  } else {
+    // 日をまたぐ場合
+    for (let m = 0; m < totalMinutes; m++) {
+      const currentMinute = (startMinutes + m) % (24 * 60);
+      if (currentMinute >= nightStart || currentMinute < nightEnd) {
+        nightMinutes++;
+      } else {
+        normalMinutes++;
+      }
+    }
+  }
+  
+  return {
+    normalHours: normalMinutes / 60,
+    nightHours: nightMinutes / 60
+  };
+}
+
+// 集計表示更新
+function updateSummary(baseWage, nightRate, holidayInc, normalHours, nightHours, holidayHours, holidayNightHours, workDays) {
+  const normalWage = baseWage;
+  const nightWage = Math.round(baseWage * nightRate);
+  const holidayWage = baseWage + holidayInc;
+  const holidayNightWage = Math.round((baseWage + holidayInc) * nightRate);
+  
+  const normalPay = Math.round(normalHours * normalWage);
+  const nightPay = Math.round(nightHours * nightWage);
+  const holidayPay = Math.round(holidayHours * holidayWage);
+  const holidayNightPay = Math.round(holidayNightHours * holidayNightWage);
+  
+  const total = normalPay + nightPay + holidayPay + holidayNightPay;
+  
+  // 表示更新
+  document.getElementById('workDays').textContent = `${workDays}日`;
+  document.getElementById('normalWage').textContent = `${normalWage}円`;
+  document.getElementById('normalHours').textContent = `${normalHours.toFixed(2)}h`;
+  document.getElementById('normalPay').textContent = `${normalPay}円`;
+  
+  document.getElementById('nightWage').textContent = `${nightWage}円`;
+  document.getElementById('nightHours').textContent = `${nightHours.toFixed(2)}h`;
+  document.getElementById('nightPay').textContent = `${nightPay}円`;
+  
+  document.getElementById('holidayWageDisplay').textContent = `${holidayWage}円`;
+  document.getElementById('holidayHours').textContent = `${holidayHours.toFixed(2)}h`;
+  document.getElementById('holidayPay').textContent = `${holidayPay}円`;
+  
+  document.getElementById('holidayNightWageDisplay').textContent = `${holidayNightWage}円`;
+  document.getElementById('holidayNightHours').textContent = `${holidayNightHours.toFixed(2)}h`;
+  document.getElementById('holidayNightPay').textContent = `${holidayNightPay}円`;
+  
+  document.getElementById('total').textContent = `${total}円`;
+}
+
+// 初期計算実行
+calculate();
 </script>
 </body>
 </html>
