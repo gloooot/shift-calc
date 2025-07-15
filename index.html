@@ -306,7 +306,8 @@ function calculate() {
     totalHolidayHours += holidayHours;
     totalHolidayNightHours += holidayNightHours;
     
-    // 日給計算
+    // 日給計算（実働時間ベース）
+    const actualHours = totalMinutes / 60; // 休憩時間を引いた実働時間
     const dayPay = 
       normalHours * baseWage +
       nightHours * baseWage * nightRate +
@@ -400,32 +401,20 @@ function getBreakRules() {
 }
 
 // 時間帯別時間計算（通常/深夜）
-function calculateHoursByPeriod(startMinutes, endMinutes, totalMinutes) {
+function calculateHoursByPeriod(startMinutes, endMinutes, actualWorkMinutes) {
   const nightStart = 22 * 60; // 22:00
   const nightEnd = 5 * 60;    // 5:00
   
   let normalMinutes = 0;
   let nightMinutes = 0;
   
-  if (endMinutes >= startMinutes) {
-    // 日をまたがない場合
-    for (let m = startMinutes; m < startMinutes + totalMinutes; m++) {
-      const currentMinute = m % (24 * 60);
-      if (currentMinute >= nightStart || currentMinute < nightEnd) {
-        nightMinutes++;
-      } else {
-        normalMinutes++;
-      }
-    }
-  } else {
-    // 日をまたぐ場合
-    for (let m = 0; m < totalMinutes; m++) {
-      const currentMinute = (startMinutes + m) % (24 * 60);
-      if (currentMinute >= nightStart || currentMinute < nightEnd) {
-        nightMinutes++;
-      } else {
-        normalMinutes++;
-      }
+  // 実働時間分だけループして、通常時間と深夜時間を分ける
+  for (let m = 0; m < actualWorkMinutes; m++) {
+    const currentMinute = (startMinutes + m) % (24 * 60);
+    if (currentMinute >= nightStart || currentMinute < nightEnd) {
+      nightMinutes++;
+    } else {
+      normalMinutes++;
     }
   }
   
