@@ -306,8 +306,7 @@ function calculate() {
     totalHolidayHours += holidayHours;
     totalHolidayNightHours += holidayNightHours;
     
-    // 日給計算（実働時間ベース）
-    const actualHours = totalMinutes / 60; // 休憩時間を引いた実働時間
+    // 日給計算（深夜時給は切り上げ）
     const nightWageRounded = Math.ceil(baseWage * nightRate); // 深夜時給は切り上げ
     const holidayNightWageRounded = Math.ceil((baseWage + holidayInc) * nightRate); // 正月深夜時給も切り上げ
     
