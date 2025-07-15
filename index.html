@@ -308,13 +308,16 @@ function calculate() {
     
     // 日給計算（実働時間ベース）
     const actualHours = totalMinutes / 60; // 休憩時間を引いた実働時間
+    const nightWageRounded = Math.ceil(baseWage * nightRate); // 深夜時給は切り上げ
+    const holidayNightWageRounded = Math.ceil((baseWage + holidayInc) * nightRate); // 正月深夜時給も切り上げ
+    
     const dayPay = 
       normalHours * baseWage +
-      nightHours * baseWage * nightRate +
+      nightHours * nightWageRounded +
       holidayHours * (baseWage + holidayInc) +
-      holidayNightHours * (baseWage + holidayInc) * nightRate;
+      holidayNightHours * holidayNightWageRounded;
     
-    payCell.textContent = Math.round(dayPay);
+    payCell.textContent = Math.round(dayPay).toLocaleString();
     restCell.textContent = breakMinutes;
   });
   
@@ -342,23 +345,29 @@ function calculateDayShift(startTime, endTime, day, holidayStart, holidayEnd, en
   const workHours = totalMinutes / 60;
   const breakMinutes = calculateBreakTime(workHours, breakRules);
   
-  // 実働時間
-  const actualMinutes = totalMinutes - breakMinutes;
-  
-  // 時間の丸め処理
-  const roundedMinutes = Math.floor(actualMinutes / rounding) * rounding;
-  
   const isHoliday = enableHoliday && day >= holidayStart && day <= holidayEnd;
   
   // 時間帯別計算（休憩時間を深夜から優先的に引く）
   const { normalHours, nightHours } = calculateHoursByPeriodWithBreak(start, end, totalMinutes, breakMinutes);
   
+  // 15分単位での丸め処理（各時間帯別に適用）
+  const roundedNormalHours = Math.floor((normalHours * 60) / rounding) * rounding / 60;
+  const roundedNightHours = Math.floor((nightHours * 60) / rounding) * rounding / 60;
+  
+  const finalNormalHours = isHoliday ? 0 : roundedNormalHours;
+  const finalNightHours = isHoliday ? 0 : roundedNightHours;
+  const finalHolidayHours = isHoliday ? roundedNormalHours : 0;
+  const finalHolidayNightHours = isHoliday ? roundedNightHours : 0;
+  
+  // 実働時間の合計（表示用）
+  const totalRoundedMinutes = (roundedNormalHours + roundedNightHours) * 60;
+  
   return {
-    normalHours: isHoliday ? 0 : normalHours,
-    nightHours: isHoliday ? 0 : nightHours,
-    holidayHours: isHoliday ? normalHours : 0,
-    holidayNightHours: isHoliday ? nightHours : 0,
-    totalMinutes: roundedMinutes,
+    normalHours: finalNormalHours,
+    nightHours: finalNightHours,
+    holidayHours: finalHolidayHours,
+    holidayNightHours: finalHolidayNightHours,
+    totalMinutes: totalRoundedMinutes,
     breakMinutes
   };
 }
@@ -419,18 +428,14 @@ function calculateHoursByPeriodWithBreak(startMinutes, endMinutes, totalMinutes,
   }
   
   // 休憩時間を深夜時間から優先的に引く
-  let remainingBreak = breakMinutes;
-  
-  if (remainingBreak > 0 && nightMinutes > 0) {
-    const deductFromNight = Math.min(remainingBreak, nightMinutes);
+  if (breakMinutes > 0 && nightMinutes > 0) {
+    const deductFromNight = Math.min(breakMinutes, nightMinutes);
     nightMinutes -= deductFromNight;
-    remainingBreak -= deductFromNight;
+    breakMinutes -= deductFromNight;
   }
   
-  if (remainingBreak > 0 && normalMinutes > 0) {
-    const deductFromNormal = Math.min(remainingBreak, normalMinutes);
-    normalMinutes -= deductFromNormal;
-    remainingBreak -= deductFromNormal;
+  if (breakMinutes > 0 && normalMinutes > 0) {
+    normalMinutes -= Math.min(breakMinutes, normalMinutes);
   }
   
   return {
@@ -442,9 +447,9 @@ function calculateHoursByPeriodWithBreak(startMinutes, endMinutes, totalMinutes,
 // 集計表示更新
 function updateSummary(baseWage, nightRate, holidayInc, normalHours, nightHours, holidayHours, holidayNightHours, workDays) {
   const normalWage = baseWage;
-  const nightWage = Math.round(baseWage * nightRate);
+  const nightWage = Math.ceil(baseWage * nightRate); // 深夜時給は切り上げ
   const holidayWage = baseWage + holidayInc;
-  const holidayNightWage = Math.round((baseWage + holidayInc) * nightRate);
+  const holidayNightWage = Math.ceil((baseWage + holidayInc) * nightRate); // 正月深夜時給も切り上げ
   
   const normalPay = Math.round(normalHours * normalWage);
   const nightPay = Math.round(nightHours * nightWage);
@@ -453,25 +458,25 @@ function updateSummary(baseWage, nightRate, holidayInc, normalHours, nightHours,
   
   const total = normalPay + nightPay + holidayPay + holidayNightPay;
   
-  // 表示更新
+  // 表示更新（カンマ区切り適用）
   document.getElementById('workDays').textContent = `${workDays}日`;
-  document.getElementById('normalWage').textContent = `${normalWage}円`;
+  document.getElementById('normalWage').textContent = `${normalWage.toLocaleString()}円`;
   document.getElementById('normalHours').textContent = `${normalHours.toFixed(2)}h`;
-  document.getElementById('normalPay').textContent = `${normalPay}円`;
+  document.getElementById('normalPay').textContent = `${normalPay.toLocaleString()}円`;
   
-  document.getElementById('nightWage').textContent = `${nightWage}円`;
+  document.getElementById('nightWage').textContent = `${nightWage.toLocaleString()}円`;
   document.getElementById('nightHours').textContent = `${nightHours.toFixed(2)}h`;
-  document.getElementById('nightPay').textContent = `${nightPay}円`;
+  document.getElementById('nightPay').textContent = `${nightPay.toLocaleString()}円`;
   
-  document.getElementById('holidayWageDisplay').textContent = `${holidayWage}円`;
+  document.getElementById('holidayWageDisplay').textContent = `${holidayWage.toLocaleString()}円`;
   document.getElementById('holidayHours').textContent = `${holidayHours.toFixed(2)}h`;
-  document.getElementById('holidayPay').textContent = `${holidayPay}円`;
+  document.getElementById('holidayPay').textContent = `${holidayPay.toLocaleString()}円`;
   
-  document.getElementById('holidayNightWageDisplay').textContent = `${holidayNightWage}円`;
+  document.getElementById('holidayNightWageDisplay').textContent = `${holidayNightWage.toLocaleString()}円`;
   document.getElementById('holidayNightHours').textContent = `${holidayNightHours.toFixed(2)}h`;
-  document.getElementById('holidayNightPay').textContent = `${holidayNightPay}円`;
+  document.getElementById('holidayNightPay').textContent = `${holidayNightPay.toLocaleString()}円`;
   
-  document.getElementById('total').textContent = `${total}円`;
+  document.getElementById('total').textContent = `${total.toLocaleString()}円`;
 }
 
 // 初期計算実行
