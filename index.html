@@ -176,7 +176,7 @@ async function loadData() {
   }
 }
 function updateDisplay(total) {
-  const limit = 1030000;
+  const limit = 1500000;
   const remaining = Math.max(0, limit - total);
   const percent = Math.min(100, Math.floor((total / limit) * 100));
   document.getElementById("totalDisplay").textContent = total.toLocaleString();
