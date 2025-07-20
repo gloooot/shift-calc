@@ -82,7 +82,7 @@
 </div>
 <button class="collapsible">休憩ルール（クリックで表示/非表示）</button>
 <div class="content" id="customBreakRules">
-  <div class="compact-row"><input class="small-input" value="4">時間未満 → <input class="small-input" value="0">分</div>
+  <div class="compact-row"><input class="small-input" value="0">時間以上<input class="small-input" value="4">時間未満 → <input class="small-input" value="0">分</div>
   <div class="compact-row"><input class="small-input" value="4">時間以上<input class="small-input" value="6">時間未満 → <input class="small-input" value="15">分</div>
   <div class="compact-row"><input class="small-input" value="6">時間以上<input class="small-input" value="9">時間未満 → <input class="small-input" value="45">分</div>
   <div class="compact-row"><input class="small-input" value="9">時間以上 → <input class="small-input" value="60">分</div>
@@ -390,16 +390,27 @@ function calculateBreakTime(workHours, breakRules) {
 }
 
 // 休憩ルール取得
+// 修正前の関数を以下に完全置換
 function getBreakRules() {
   const rows = document.querySelectorAll('#customBreakRules .compact-row');
   const rules = [];
   
   rows.forEach(row => {
     const inputs = row.querySelectorAll('input');
-    if (inputs.length >= 3) {
+    
+    // 入力フィールドの数に応じて処理
+    if (inputs.length === 3) {
+      // "X時間以上Y時間未満 → Z分" のパターン
       const minHours = parseFloat(inputs[0].value) || 0;
-      const maxHours = inputs.length > 3 ? parseFloat(inputs[1].value) : null;
-      const breakMinutes = parseFloat(inputs[inputs.length - 1].value) || 0;
+      const maxHours = parseFloat(inputs[1].value) || null;
+      const breakMinutes = parseFloat(inputs[2].value) || 0;
+      
+      rules.push({ minHours, maxHours, breakMinutes });
+    } else if (inputs.length === 2) {
+      // "X時間以上 → Y分" のパターン（上限なし）
+      const minHours = parseFloat(inputs[0].value) || 0;
+      const maxHours = null;
+      const breakMinutes = parseFloat(inputs[1].value) || 0;
       
       rules.push({ minHours, maxHours, breakMinutes });
     }
